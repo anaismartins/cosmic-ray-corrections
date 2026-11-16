@@ -82,7 +82,7 @@ def matched_filter(res, glitch_params=None):
                                                                           fft_length), fft_length)
     score = correlation[len(glitch_model) - 1:len(res)] / (g.SIGMA * template_norm)
 
-    glitch_idx, _ = find_peaks(score, height=g.CUT_OFF, distance=max(1, int(0.05 * g.SAMPRATE)))
+    glitch_idx, _ = find_peaks(score, height=g.CUT_OFF, prominence=5)
     # print(f"Glitch indices: {(glitch_idx[glitch_idx < 1000])}")
 
     return glitch_idx, score

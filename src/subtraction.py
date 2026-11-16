@@ -83,11 +83,12 @@ def subtract_glitches_from_data(glitch_idx, seconds, glitch_labels, glitch_amps,
     amps = np.asarray(glitch_amps) * x
 
     result = res.copy()
+    oneminute = np.arange(0, 60 * g.SAMPRATE) / g.SAMPRATE
 
     for (glitch_i, glitch_id), glitch_amp in zip(enumerate(glitch_idx), amps):
         params = glitch_params[glitch_labels[glitch_i]] if glitch_params else None
 
-        glitch_model = templates.glitch_model_func(np.arange(0, g.NSECS, 1 / g.SAMPRATE),
+        glitch_model = templates.glitch_model_func(np.arange(0, oneminute[-1], 1 / g.SAMPRATE),
                                                    glitch_amp, glitch_type=glitch_labels[glitch_i],
                                                    glitch_params=params)
         if glitch_id + len(glitch_model) < len(res):

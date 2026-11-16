@@ -32,6 +32,9 @@ def main():
         if not os.path.exists(f"{g.FIGURES_PATH}detection/{simname}/"):
             os.makedirs(f"{g.FIGURES_PATH}detection/{simname}/")
 
+        if not os.path.exists(f"{g.FIGURES_PATH}classification/{simname}/"):
+            os.makedirs(f"{g.FIGURES_PATH}classification/{simname}/")
+
         plt.plot(seconds[:1000], score[:1000])
         visible = glitch_idx[glitch_idx < 1000]
         plt.scatter(seconds[visible], score[visible], color='red', label='Glitches')
@@ -43,7 +46,8 @@ def main():
         plt.close()
 
     glitch_idx, glitch_labels, glitch_amps = classification.classify_glitches(glitch_idx, res,
-                                                                              seconds)
+                                                                              seconds,
+                                                                              sim_name=simname)
 
     # count how many wrong classifications
     wrong_classifications = np.sum(glitch_labels[np.isin(glitch_idx, matched_indices)] != sim_types[np.isin(sim_indices, matched_indices)])
@@ -63,6 +67,9 @@ def main():
         if not os.path.exists(f"{g.FIGURES_PATH}subtraction/{simname}/"):
             os.makedirs(f"{g.FIGURES_PATH}subtraction/{simname}/")
 
+        if not os.path.exists(f"{g.FIGURES_PATH}templates/{simname}/"):
+            os.makedirs(f"{g.FIGURES_PATH}templates/{simname}/")
+
         plt.plot(seconds[:1000], res[:1000], label='Original Data')
         plt.plot(seconds[:1000], result[:1000], label='Data after Glitch Subtraction')
         plt.scatter(seconds[glitch_idx], res[glitch_idx], color='red', label='Detected Glitches')
@@ -76,7 +83,8 @@ def main():
 
     # quit() 
 
-    final_stack = templates.stacking(result, glitch_idx, glitch_labels, fit_amps, seconds)
+    final_stack = templates.stacking(result, glitch_idx, glitch_labels, fit_amps, seconds,
+                                     simname=simname)
 
     temp = templates._load_glitch_params()
     glitch_params = {}
@@ -134,7 +142,7 @@ def main():
                                                          glitch_params, iter=i+1,
                                                          prev_amps=fit_amps,
                                                          prev_labels=glitch_labels,
-                                                         prev_idx=prev_idx)
+                                                         prev_idx=prev_idx, sim_name=simname)
 
         wrong_classifications = np.sum(glitch_labels[np.isin(glitch_idx, matched_indices)] != sim_types[np.isin(sim_indices, matched_indices)])
         print(f"[Iteration {i+1}] Classification accuracy: {100 * (1 - wrong_classifications / len(glitch_idx)):.2f}%")
@@ -159,7 +167,8 @@ def main():
             plt.savefig(f"{g.FIGURES_PATH}subtraction/{simname}/glitch_subtraction_result_{(i+1)}.png")
             plt.close()
 
-        final_stack = templates.stacking(result, glitch_idx, glitch_labels, fit_amps, seconds)
+        final_stack = templates.stacking(result, glitch_idx, glitch_labels, fit_amps, seconds,
+                                         simname=simname)
 
         temp = glitch_params.copy()
         glitch_params = {}

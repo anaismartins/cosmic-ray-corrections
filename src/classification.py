@@ -19,17 +19,19 @@ def _template(t, A, glitch_type, glitch_params=None):
 def chi2(data, model):
     return np.sum((data - model) ** 2) / g.SIGMA**2
 
-def classify_glitches(glitch_idx, res, seconds, glitch_params=None, iter=0, prev_amps=None,
-                      prev_labels=None, prev_idx=None):
-    """glitch_params: optional {glitch_type: template params} from a previous iteration.
-    If None, the default templates are used."""
+def classify_glitches(glitch_idx, res, seconds, glitch_params=None, iter=0, sim_name="",
+                      prev_amps=None, prev_labels=None, prev_idx=None):
+    """
+    glitch_params: optional {glitch_type: template params} from a previous iteration. If None, the
+    default templates are used.
+    """
     first_samples = int(g.FAST_PART * g.SAMPRATE)
 
     # if iter == 0 , we use only 1 second after the glitch is detected to fit
     if glitch_params is None and iter == 0:
-        total_samples = int(0.05 * g.SAMPRATE)
+        total_samples = int(g.CLASSIFY_SECS_FIRST * g.SAMPRATE)
     elif glitch_params is not None and iter > 0:
-        total_samples = int(2 * g.SAMPRATE)
+        total_samples = int(g.CLASSIFY_SECS * g.SAMPRATE)
     else:
         raise ValueError("Invalid combination of glitch_params and iter")
     slowpart = np.arange(first_samples, total_samples) / g.SAMPRATE
@@ -65,7 +67,11 @@ def classify_glitches(glitch_idx, res, seconds, glitch_params=None, iter=0, prev
     if iter > 0 and prev_amps is not None and prev_labels is not None:
         # subtreact all of the detected glitches from the data before fitting the next iteration
         for glitch_i, glitch_label, glitch_amp in zip(prev_idx, prev_labels, prev_amps):
-            res_copy[glitch_i:glitch_i + len(oneminute)] -= models[glitch_label](oneminute, glitch_amp)
+            if len(oneminute) > len(res_copy[glitch_i:]):
+                time_window = oneminute[:len(res_copy[glitch_i:])]
+            else:
+                time_window = oneminute
+            res_copy[glitch_i:glitch_i + len(oneminute)] -= models[glitch_label](time_window, glitch_amp)
 
         if g.PLOTS:
             fig_sub, ax_sub = plt.subplots(1, 1)
@@ -82,12 +88,17 @@ def classify_glitches(glitch_idx, res, seconds, glitch_params=None, iter=0, prev
         prev = {int(i): (l, a) for i, l, a in zip(prev_idx, prev_labels, prev_amps)}
 
     for glitch_n, glitch_i in enumerate(glitch_idx):
+        if len(oneminute) > len(res_copy[glitch_i:]):
+            time_window = oneminute[:len(res_copy[glitch_i:])]
+        else:
+            time_window = oneminute
+
         if iter > 0 and prev_amps is not None and prev_labels is not None:
             # add back the current glitch so that we can look at the residual timestream with only the current glitch
             old = prev.get(int(glitch_i))
             if old is not None:
-                res_copy[glitch_i:glitch_i + len(oneminute)] += models[old[0]](oneminute, old[1])
-
+                res_copy[glitch_i:glitch_i + len(time_window)] += models[old[0]](time_window,
+                                                                                 old[1])
             if g.PLOTS and glitch_n == 0:
                 fig_addback, ax_addback = plt.subplots(1, 1)
                 ax_addback.plot(seconds, res_copy, label="Residual after adding back the current glitch")
@@ -120,9 +131,12 @@ def classify_glitches(glitch_idx, res, seconds, glitch_params=None, iter=0, prev
         if iter > 0 and prev_amps is not None and prev_labels is not None and old is not None:
             res_copy[glitch_i:glitch_i + len(oneminute)] -= models[old[0]](oneminute, old[1])
 
-        print(f"DEBUG: shape of residual: {residual[glitch_i:glitch_i + len(oneminute)].shape}")
-        print(f"DEBUG: shape of model: {models[glitch_label](oneminute, *popt[glitch_label]).shape}")
-        residual[glitch_i:glitch_i + len(oneminute)] -= models[glitch_label](oneminute,
+        if len(oneminute) > len(residual[glitch_i:glitch_i + len(oneminute)]):
+            time_window = oneminute[:len(residual[glitch_i:glitch_i + len(oneminute)])]
+        else:
+            time_window = oneminute
+
+        residual[glitch_i:glitch_i + len(oneminute)] -= models[glitch_label](time_window,
                                                                              *popt[glitch_label])
 
     if g.PLOTS:
@@ -130,9 +144,10 @@ def classify_glitches(glitch_idx, res, seconds, glitch_params=None, iter=0, prev
         ax[1].set_title("Residual after subtracting the best-fit glitch model")
         ax[1].set_ylim(-0.1, 1.1)
         ax[1].set_xlabel("Time (s)")
+        ax[1].set_ylabel("Residual")
 
         plt.xlim(seconds[0], seconds[1000])
-        plt.savefig(f"{g.FIGURES_PATH}classification/classified_glitches_{iter}.png")
+        plt.savefig(f"{g.FIGURES_PATH}classification/{sim_name}/classified_glitches_{iter}.png")
         plt.close()
 
     glitch_labels = np.asarray(glitch_labels)

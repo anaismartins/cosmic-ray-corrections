@@ -62,7 +62,7 @@ def fit_glitch(res, glitch, secs):
     adjusted_res[glitch + nr_flag: glitch + 2 * 180] -= glitch_model_func(secs[glitch + nr_flag: glitch + 2 * 180] - secs[glitch], 1)
     adjusted_res[glitch: glitch + nr_flag] = 0
 
-def stacking(result, glitch_idx, glitch_labels, glitch_amps, seconds):
+def stacking(result, glitch_idx, glitch_labels, glitch_amps, seconds, simname=""):
     window = int(g.NSECS * g.SAMPRATE)
     types = ('short', 'long', 'slow')
     rows = {t: [] for t in types}
@@ -90,7 +90,7 @@ def stacking(result, glitch_idx, glitch_labels, glitch_amps, seconds):
             plt.ylabel("Amplitude")
             plt.legend()
             plt.xlim(0, seconds[1000])
-            plt.savefig(f"{g.FIGURES_PATH}templates/first_glitch_and_model.png")
+            plt.savefig(f"{g.FIGURES_PATH}templates/{simname}/first_glitch_and_model.png")
             plt.close()
 
     final_stack = {}

@@ -24,6 +24,25 @@ glitch_amps = np.random.uniform(0.1, 1.0, nglitches)  # random amplitudes for th
 glitch_types = np.random.choice(g.GLITCH_TYPES, nglitches, replace=True, p=[0.49, 0.49, 0.02])  # random glitch types
 # print(f"Glitch types: {glitch_types}")
 
+# plot each glitch type in the same figure
+if g.PLOTS:
+    if not os.path.exists(f"{g.FIGURES_PATH}sims/{nsecs}/"):
+        os.makedirs(f"{g.FIGURES_PATH}sims/{nsecs}/")
+
+    halfsecond = np.arange(0, 0.5, 1 / g.SAMPRATE)
+    slow_glitch = templates.glitch_model_func(halfsecond, 1, glitch_type="slow")
+    short_glitch = templates.glitch_model_func(halfsecond, 1, glitch_type="short")
+    long_glitch = templates.glitch_model_func(halfsecond, 1, glitch_type="long")
+    plt.figure(figsize=(10, 5))
+    plt.plot(halfsecond, slow_glitch, label="Slow Glitch")
+    plt.plot(halfsecond, short_glitch, label="Short Glitch")
+    plt.plot(halfsecond, long_glitch, label="Long Glitch")
+    plt.title("Glitch Templates")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Amplitude")
+    plt.legend()
+    plt.savefig(f"{g.FIGURES_PATH}sims/glitch_templates.png")
+
 for glitch_i, glitch_idx in enumerate(glitch_indices):
     # get the glitch model for this glitch
     glitch_model = templates.glitch_model_func(glitch_time, glitch_amps[glitch_i], band="143-2a",
@@ -58,8 +77,6 @@ if g.PLOTS:
             plt.text(seconds[i:i + plot_window][glt - i], res[i:i + plot_window][glt - i], glt_lbl,
                     fontsize=8, color='red', rotation=45)
 
-        if not os.path.exists(f"{g.FIGURES_PATH}sims/{nsecs}/"):
-            os.makedirs(f"{g.FIGURES_PATH}sims/{nsecs}/")
         if i > 0:
             break
         plt.xlim(seconds[i], seconds[i + plot_window])
