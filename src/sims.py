@@ -41,23 +41,23 @@ glitch_types = glitch_types[np.argsort(glitch_indices)]
 np.save(f"{g.DATA_PATH}143-2a_simulations_{nsecs}_types.npy", glitch_types)
 np.save(f"{g.DATA_PATH}143-2a_simulations_{nsecs}_indices.npy", glitch_indices)
 
-plot_window = 1000  # number of samples to plot
-plt.figure(figsize=(10, 5))
-for i in range(0, len(res), plot_window):
-    glt_idx = glitch_indices[(glitch_indices >= i) & (glitch_indices < i + plot_window)]
-    print(f"Glitch indices in window {i}-{i + plot_window}: {glt_idx}, and labels: "
-          f"{glitch_types[(glitch_indices >= i) & (glitch_indices < i + plot_window)]}")
-    
-    plt.plot(seconds[i:i + plot_window], res[i:i + plot_window])
-    plt.scatter(seconds[i:i + plot_window][glt_idx - i], res[i:i + plot_window][glt_idx - i],
-                color='red', label='Glitches')
+if g.PLOTS:
+    plot_window = 1000  # number of samples to plot
+    plt.figure(figsize=(10, 5))
+    for i in range(0, len(res), plot_window):
+        glt_idx = glitch_indices[(glitch_indices >= i) & (glitch_indices < i + plot_window)]
+        print(f"Glitch indices in window {i}-{i + plot_window}: {glt_idx}, and labels: "
+            f"{glitch_types[(glitch_indices >= i) & (glitch_indices < i + plot_window)]}")
+        
+        plt.plot(seconds[i:i + plot_window], res[i:i + plot_window])
+        plt.scatter(seconds[i:i + plot_window][glt_idx - i], res[i:i + plot_window][glt_idx - i],
+                    color='red', label='Glitches')
 
-    for j, glt in enumerate(glt_idx):
-        glt_lbl = glitch_types[(glitch_indices >= i) & (glitch_indices < i + plot_window)][j]
-        plt.text(seconds[i:i + plot_window][glt - i], res[i:i + plot_window][glt - i], glt_lbl,
-                 fontsize=8, color='red', rotation=45)
+        for j, glt in enumerate(glt_idx):
+            glt_lbl = glitch_types[(glitch_indices >= i) & (glitch_indices < i + plot_window)][j]
+            plt.text(seconds[i:i + plot_window][glt - i], res[i:i + plot_window][glt - i], glt_lbl,
+                    fontsize=8, color='red', rotation=45)
 
-    if g.PLOTS:
         if not os.path.exists(f"{g.FIGURES_PATH}sims/{nsecs}/"):
             os.makedirs(f"{g.FIGURES_PATH}sims/{nsecs}/")
         if i > 0:
