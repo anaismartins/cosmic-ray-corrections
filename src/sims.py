@@ -9,6 +9,9 @@ import templates as templates
 import os
 
 nsecs = 60 * 60 # 1 hour of data
+
+sim_name = f"{nsecs}_only_short"
+
 seconds = np.arange(0, nsecs, 1 / g.SAMPRATE)  # 1 hour of data at 180.3737 Hz
 
 res = np.random.normal(0, g.SIGMA, len(seconds))  # white noise
@@ -21,12 +24,15 @@ nglitches = nsecs
 glitch_time = np.linspace(0, g.NSECS, g.NSECS * 180, endpoint=False)  # glitch model lasts n seconds
 glitch_indices = np.random.choice(len(seconds), nglitches, replace=False)
 glitch_amps = np.random.uniform(0.1, 1.0, nglitches)  # random amplitudes for the glitches
-glitch_types = np.random.choice(g.GLITCH_TYPES, nglitches, replace=True, p=[0.49, 0.49, 0.02])  # random glitch types
+if len(g.GLITCH_TYPES) == 1:
+    glitch_types = np.repeat(g.GLITCH_TYPES[0], nglitches)  # all glitches are of the same type
+else:
+    glitch_types = np.random.choice(g.GLITCH_TYPES, nglitches, replace=True, p=[0.49, 0.49, 0.02])  # random glitch types
 
 # plot each glitch type in the same figure
 if g.PLOTS:
-    if not os.path.exists(f"{g.FIGURES_PATH}sims/{nsecs}/"):
-        os.makedirs(f"{g.FIGURES_PATH}sims/{nsecs}/")
+    if not os.path.exists(f"{g.FIGURES_PATH}sims/{sim_name}/"):
+        os.makedirs(f"{g.FIGURES_PATH}sims/{sim_name}/")
 
     halfsecond = np.arange(0, 0.5, 1 / g.SAMPRATE)
     slow_glitch = templates.glitch_model_func(halfsecond, 1, glitch_type="slow")
@@ -41,6 +47,7 @@ if g.PLOTS:
     plt.ylabel("Amplitude")
     plt.legend()
     plt.savefig(f"{g.FIGURES_PATH}sims/glitch_templates.png")
+    plt.close()
 
 for glitch_i, glitch_idx in enumerate(glitch_indices):
     # get the glitch model for this glitch
@@ -53,11 +60,11 @@ for glitch_i, glitch_idx in enumerate(glitch_indices):
         res[glitch_idx:] += glitch_model[:len(res) - glitch_idx]
 
 # save simulations
-np.save(f"{g.DATA_PATH}143-2a_simulations_{nsecs}.npy", res)
+np.save(f"{g.DATA_PATH}143-2a_simulations_{sim_name}.npy", res)
 # order and save glitch_types
 glitch_types = glitch_types[np.argsort(glitch_indices)]
-np.save(f"{g.DATA_PATH}143-2a_simulations_{nsecs}_types.npy", glitch_types)
-np.save(f"{g.DATA_PATH}143-2a_simulations_{nsecs}_indices.npy", glitch_indices)
+np.save(f"{g.DATA_PATH}143-2a_simulations_{sim_name}_types.npy", glitch_types)
+np.save(f"{g.DATA_PATH}143-2a_simulations_{sim_name}_indices.npy", glitch_indices)
 
 if g.PLOTS:
     plot_window = 1000  # number of samples to plot
@@ -83,5 +90,5 @@ if g.PLOTS:
         plt.ylabel("Amplitude")
         plt.title("Glitch Simulation")
         plt.legend()
-        plt.savefig(f"{g.FIGURES_PATH}sims/{nsecs}/{i}_{i+plot_window}.png")
+        plt.savefig(f"{g.FIGURES_PATH}sims/{sim_name}/{i}_{i+plot_window}.png")
         plt.close()

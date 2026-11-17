@@ -47,10 +47,9 @@ def glitch_model_func(t, A=1, band="143-2a", glitch_type = "short", glitch_param
 
     return glitch_model * A
 
-def stacking(result, glitch_idx, glitch_labels, glitch_amps, seconds, simname=""):
+def stacking(result, glitch_idx, glitch_labels, glitch_amps, seconds, glitch_params=None, simname=""):
     window = int(g.NSECS * g.SAMPRATE)
-    types = ('short', 'long', 'slow')
-    rows = {t: [] for t in types}
+    rows = {t: [] for t in g.GLITCH_TYPES}
 
     for i, idx in enumerate(glitch_idx):
         if idx + window > len(result):
@@ -60,7 +59,8 @@ def stacking(result, glitch_idx, glitch_labels, glitch_amps, seconds, simname=""
         result[idx:idx + window] -= np.median(result[idx:idx + window])
 
         label = glitch_labels[i]
-        model = glitch_model_func(seconds[:window], glitch_amps[i], glitch_type=label)
+        model = glitch_model_func(seconds[:window], glitch_amps[i], glitch_type=label,
+                                  glitch_params=glitch_params[label] if glitch_params else None)
 
         rows[label].append((result[idx:idx + window] + model) / glitch_amps[i])
 
@@ -79,7 +79,7 @@ def stacking(result, glitch_idx, glitch_labels, glitch_amps, seconds, simname=""
             plt.close()
 
     final_stack = {}
-    for t in types:
+    for t in g.GLITCH_TYPES:
         if rows[t]:
             final_stack[t] = np.median(np.vstack(rows[t]), axis=0)
             final_stack[t] /= np.max(final_stack[t])  # normalize the stacked average to have a max of 1
@@ -131,10 +131,6 @@ def glitch_estimation(seconds, stack, glitch_type, glitch_params=None):
     glitch_params = {'Amplitude' + str(i + 1): popt[i] for i in range(8)}
     glitch_params.update({'Tau' + str(i + 1): popt[i +8] for i in range(8)})
     return glitch_params
-
-def chi2_glitches(data):
-    chi2 = np.sum((data_i - (a_i * glitch_model(seconds, params) + offset_i) / sigma)**2)
-    return chi2
 
 def amp_matrix(glitch_type="short"):
     # Create a matrix of amplitudes for each glitch type and each amplitude index

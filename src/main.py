@@ -8,10 +8,11 @@ import templates
 import utils
 import os
 import time
-
+from functools import partial
+from scipy.optimize import curve_fit
 
 def main(log_name=None):
-    simname = "143-2a_simulations_3600"
+    simname = "143-2a_simulations_3600_only_short"
 
     res = np.load(f"{g.DATA_PATH}{simname}.npy")
     sim_types = np.load(f"{g.DATA_PATH}{simname}_types.npy")
@@ -21,9 +22,6 @@ def main(log_name=None):
     # for now, we are excluding the classification etc of the last min of data, so let's exclude those from the sims
     sim_types = sim_types[sim_indices < len(res) - g.SAMPRATE * 60]
     sim_indices = sim_indices[sim_indices < len(res) - g.SAMPRATE * 60]
-
-    message = "Iteration 0"
-    utils.log_output(log_name, message)
 
     glitch_idx, score = detection.matched_filter(res)
     # match the detected glitches with the simulated ones
@@ -36,8 +34,9 @@ def main(log_name=None):
         if not os.path.exists(f"{g.FIGURES_PATH}detection/{simname}/"):
             os.makedirs(f"{g.FIGURES_PATH}detection/{simname}/")
 
-        if not os.path.exists(f"{g.FIGURES_PATH}classification/{simname}/"):
-            os.makedirs(f"{g.FIGURES_PATH}classification/{simname}/")
+        if len(g.GLITCH_TYPES) > 1:
+            if not os.path.exists(f"{g.FIGURES_PATH}templates/{simname}/"):
+                os.makedirs(f"{g.FIGURES_PATH}templates/{simname}/")
 
         plt.plot(seconds[:1000], score[:1000])
         visible = glitch_idx[glitch_idx < 1000]
@@ -49,22 +48,34 @@ def main(log_name=None):
         plt.savefig(f"{g.FIGURES_PATH}detection/{simname}/matched_filter_result_0.png")
         plt.close()
 
-    glitch_idx, glitch_labels, glitch_amps = classification.classify_glitches(glitch_idx, res,
-                                                                              seconds,
-                                                                              sim_name=simname,
-                                                                              log_name=log_name)
+    if len(g.GLITCH_TYPES) > 1:
+        glitch_idx, glitch_labels, glitch_amps = classification.classify_glitches(glitch_idx, res,
+                                                                                seconds,
+                                                                                sim_name=simname,
+                                                                                log_name=log_name)
 
-    # count how many wrong classifications
-    wrong_classifications = np.sum(glitch_labels[np.isin(glitch_idx, matched_indices)] != sim_types[np.isin(sim_indices, matched_indices)])
-    message = ("[Iteration 0] Classification accuracy: "
-               f"{100 * (1 - wrong_classifications / len(glitch_idx)):.2f}%\nPercentage of "
-               "glitches classified as 'short': "
-               f"{100 * np.sum(glitch_labels == 'short') / len(glitch_labels):.2f}%\nPercentage of "
-               "glitches classified as 'long': "
-               f"{100 * np.sum(glitch_labels == 'long') / len(glitch_labels):.2f}%\nPercentage of "
-               "glitches classified as 'slow': "
-               f"{100 * np.sum(glitch_labels == 'slow') / len(glitch_labels):.2f}%")
-    utils.log_output(log_name, message)
+        # count how many wrong classifications
+        wrong_classifications = np.sum(glitch_labels[np.isin(glitch_idx, matched_indices)] != sim_types[np.isin(sim_indices, matched_indices)])
+        message = ("[Iteration 0] Classification accuracy: "
+                f"{100 * (1 - wrong_classifications / len(glitch_idx)):.2f}% Percentage of "
+                "glitches classified as 'short': "
+                f"{100 * np.sum(glitch_labels == 'short') / len(glitch_labels):.2f}%\nPercentage of "
+                "glitches classified as 'long': "
+                f"{100 * np.sum(glitch_labels == 'long') / len(glitch_labels):.2f}%\nPercentage of "
+                "glitches classified as 'slow': "
+                f"{100 * np.sum(glitch_labels == 'slow') / len(glitch_labels):.2f}%")
+
+        utils.log_output(log_name, message)
+    else:
+        glitch_labels = np.repeat(g.GLITCH_TYPES[0], len(glitch_idx))
+        glitch_amps = np.zeros(len(glitch_idx))
+        model = partial(classification._template, glitch_type="short")
+        for glitch_n, glitch_i in enumerate(glitch_idx):
+            time_ax = np.arange(0, g.NSECS, 1 / g.SAMPRATE)
+            popt, _ = curve_fit(model, time_ax,
+                                res[glitch_i:glitch_i + int(g.NSECS * g.SAMPRATE) + 1],
+                                p0=[1], bounds=(0, np.inf))
+            glitch_amps[glitch_n] = popt[0]
 
     result, fit_amps = subtraction.subtract_glitches_from_data(glitch_idx, seconds,
                                                                   glitch_labels, glitch_amps, res)
@@ -92,14 +103,12 @@ def main(log_name=None):
         plt.savefig(f"{g.FIGURES_PATH}subtraction/{simname}/glitch_subtraction_result_0.png")
         plt.close()
 
-    # quit() 
-
     final_stack = templates.stacking(result, glitch_idx, glitch_labels, fit_amps, seconds,
                                      simname=simname)
 
     temp = templates._load_glitch_params()
     glitch_params = {}
-    for glitch_type in ['short', 'long', 'slow']:
+    for glitch_type in g.GLITCH_TYPES:
         if final_stack[glitch_type] is None:
             message = f"No {glitch_type} glitches found, keeping previous template"
             utils.log_output(log_name, message)
@@ -129,12 +138,11 @@ def main(log_name=None):
             plt.savefig(f"{g.FIGURES_PATH}templates/{simname}/glitch_fitting_{glitch_type}_0.png")
             plt.close()
 
-    maxiter = 100
-    for i in range(maxiter):
-        message = f"Iteration {i+1}/{maxiter}"
+    for i in range(g.MAXITER):
+        message = f"Iteration {i+1}/{g.MAXITER}"
         utils.log_output(log_name, message)
         prev_idx = glitch_idx.copy()
-        glitch_idx, score = detection.matched_filter(res, glitch_params['long'])
+        glitch_idx, score = detection.matched_filter(res, glitch_params['short'])
 
         matched_indices = np.intersect1d(glitch_idx, sim_indices)
         message = (f"[Iteration {i+1}] Detection accuracy: "
@@ -152,26 +160,50 @@ def main(log_name=None):
             plt.savefig(f"{g.FIGURES_PATH}detection/{simname}/matched_filter_result_" + str(i+1) + ".png")
             plt.close()
 
-        (glitch_idx, glitch_labels,
-         glitch_amps) = classification.classify_glitches(glitch_idx, res, seconds,
-                                                         glitch_params, iter=i+1,
-                                                         prev_amps=fit_amps,
-                                                         prev_labels=glitch_labels,
-                                                         prev_idx=prev_idx, sim_name=simname,
-                                                         log_name=log_name)
+        if len(g.GLITCH_TYPES) > 1:
+            (glitch_idx, glitch_labels,
+            glitch_amps) = classification.classify_glitches(glitch_idx, res, seconds,
+                                                            glitch_params, iter=i+1,
+                                                            prev_amps=fit_amps,
+                                                            prev_labels=glitch_labels,
+                                                            prev_idx=prev_idx, sim_name=simname,
+                                                            log_name=log_name)
 
-        wrong_classifications = np.sum(glitch_labels[np.isin(glitch_idx, matched_indices)] != sim_types[np.isin(sim_indices, matched_indices)])
-        message = (f"[Iteration {i+1}] Classification accuracy: "
-                   f"{100 * (1 - wrong_classifications / len(glitch_idx)):.2f}%")
-        utils.log_output(log_name, message)
+            wrong_classifications = np.sum(glitch_labels[np.isin(glitch_idx, matched_indices)] != sim_types[np.isin(sim_indices, matched_indices)])
+            message = (f"[Iteration {i+1}] Classification accuracy: "
+                    f"{100 * (1 - wrong_classifications / len(glitch_idx)):.2f}% Percentage of "
+                "glitches classified as 'short': "
+                f"{100 * np.sum(glitch_labels == 'short') / len(glitch_labels):.2f}%\nPercentage of "
+                "glitches classified as 'long': "
+                f"{100 * np.sum(glitch_labels == 'long') / len(glitch_labels):.2f}%\nPercentage of "
+                "glitches classified as 'slow': "
+                f"{100 * np.sum(glitch_labels == 'slow') / len(glitch_labels):.2f}%")
+            utils.log_output(log_name, message)
+
+        else:
+            glitch_labels = np.repeat(g.GLITCH_TYPES[0], len(glitch_idx))
+            glitch_amps = np.zeros(len(glitch_idx))
+            model = partial(classification._template, glitch_type="short")
+            for glitch_n, glitch_i in enumerate(glitch_idx):
+                time_ax = np.arange(0, g.NSECS, 1 / g.SAMPRATE) 
+                popt, _ = curve_fit(model, time_ax,
+                                    res[glitch_i:glitch_i + int(g.NSECS * g.SAMPRATE) + 1],
+                                    p0=[1], bounds=(0, np.inf))
+                glitch_amps[glitch_n] = popt[0]
+
+        # if the new glitch idx match the previous one, as well as the label, use the pewviously 
+        # estimated amplitues. otherwise take from the newly estimated ones
+        prev_amps = np.array([fit_amps[prev_idx == idx][0] if (idx in prev_idx and glitch_labels[prev_idx == idx][0] == label) else amp
+                            for idx, label, amp in zip(glitch_idx, glitch_labels, glitch_amps)])
 
         result, fit_amps = subtraction.subtract_glitches_from_data(glitch_idx, seconds,
-                                                                glitch_labels, glitch_amps, res,
+                                                                glitch_labels, prev_amps, res,
                                                                 glitch_params=glitch_params)
 
         # calculate chi2
         chi2_value = utils.chi2(result)
         message = (f"[Iteration {i+1}] Chi2: {int(chi2_value)}")
+        utils.log_output(log_name, message)
 
         if g.PLOTS:
             plt.plot(seconds[:1000], res[:1000], label='Original Data')
@@ -186,11 +218,11 @@ def main(log_name=None):
             plt.close()
 
         final_stack = templates.stacking(result, glitch_idx, glitch_labels, fit_amps, seconds,
-                                         simname=simname)
+                                         glitch_params=glitch_params, simname=simname)
 
         temp = glitch_params.copy()
         glitch_params = {}
-        for glitch_type in ['short', 'long', 'slow']:
+        for glitch_type in g.GLITCH_TYPES:
             if final_stack[glitch_type] is None:
                 message = f"No {glitch_type} glitches found, keeping previous template"
                 utils.log_output(log_name, message)

@@ -16,19 +16,22 @@ def normalized_chi2(res):
 def log_params(log_file):
     with open(log_file, 'a') as f:
         f.write("Parameters:\n")
-        f.write(f"WINDOWSIZE: {g.WINDOWSIZE}\n")
         f.write(f"FIGURES_PATH: {g.FIGURES_PATH}\n")
         f.write(f"DATA_PATH: {g.DATA_PATH}\n")
+        f.write(f"LOG_PATH: {g.LOG_PATH}\n\n")
         f.write(f"BAND_LIST: {g.BAND_LIST}\n")
-        f.write(f"GLITCH_TYPES: {g.GLITCH_TYPES}\n")
+        f.write(f"GLITCH_TYPES: {g.GLITCH_TYPES}\n\n")
         f.write(f"SAMPRATE: {g.SAMPRATE}\n")
-        f.write(f"SIGMA: {g.SIGMA}\n")
+        f.write(f"SIGMA: {g.SIGMA}\n\n")
         f.write(f"FAST_PART: {g.FAST_PART}\n")
-        f.write(f"CUT_OFF: {g.CUT_OFF}\n")
-        f.write(f"NO_TRUST: {g.NO_TRUST}\n")
+        f.write(f"NO_TRUST: {g.NO_TRUST}\n\n")
+        f.write(f"CUT_OFF: {g.CUT_OFF}\n\n")
         f.write(f"NSECS: {g.NSECS}\n")
         f.write(f"CLASSIFY_SECS_FIRST: {g.CLASSIFY_SECS_FIRST}\n")
-        f.write(f"CLASSIFY_SECS: {g.CLASSIFY_SECS}\n")
+        f.write(f"CLASSIFY_SECS: {g.CLASSIFY_SECS}\n\n")
+        f.write(f"MAXITER: {g.MAXITER}\n\n")
+        f.write(f"PLOTS: {g.PLOTS}\n\n")
+        f.write("--------------------------------------------------\n\n")
 
 def log_output(log_file, message):
     print(message)
