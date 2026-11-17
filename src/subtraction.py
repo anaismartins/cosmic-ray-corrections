@@ -35,9 +35,6 @@ def build_template_matrix(glitch_idx, seconds, glitch_labels, glitch_amps, glitc
 
     oneminute = np.arange(0, 60 * g.SAMPRATE) / g.SAMPRATE
 
-    # print(f"Building template matrix with {nglitch} glitches and {ntod} samples. Shape of "
-    #       f"glitch_idx: {glitch_idx.shape}, glitch_labels: {len(glitch_labels)}, glitch_amps: "
-    #       f"{len(glitch_amps)}")
     tasks = [(index, glitch_i, glitch_labels[index], glitch_amps[index], ntod, oneminute,
               glitch_params) for index, glitch_i in enumerate(glitch_idx)]
     if not tasks:
@@ -60,18 +57,8 @@ def calculate_A(T):
     A = T.T @ T / g.SIGMA**2
     return A
 
-def run_cg(glitch_idx, seconds, glitch_labels, glitch_amps, res):
-    T = build_template_matrix(glitch_idx, seconds, glitch_labels, glitch_amps)
-    b = calculate_b(res, T)
-    A = calculate_A(T)
-    x, info = cg(A, b)
-    if info != 0:
-        print(f"CG solver did not converge. Info: {info}")
-    return x
-
 def subtract_glitches_from_data(glitch_idx, seconds, glitch_labels, glitch_amps, res,
                                 glitch_params=None):
-    # x = run_cg(glitch_idx, seconds, glitch_labels, glitch_amps, res)
     T = build_template_matrix(glitch_idx, seconds, glitch_labels, glitch_amps,
                               glitch_params=glitch_params)
     b = calculate_b(res, T)

@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import templates
 from scipy.optimize import curve_fit
+import utils
 
 
 def _template(t, A, glitch_type, glitch_params=None):
@@ -20,7 +21,7 @@ def chi2(data, model):
     return np.sum((data - model) ** 2) / g.SIGMA**2
 
 def classify_glitches(glitch_idx, res, seconds, glitch_params=None, iter=0, sim_name="",
-                      prev_amps=None, prev_labels=None, prev_idx=None):
+                      prev_amps=None, prev_labels=None, prev_idx=None, log_name=None):
     """
     glitch_params: optional {glitch_type: template params} from a previous iteration. If None, the
     default templates are used.
@@ -43,8 +44,9 @@ def classify_glitches(glitch_idx, res, seconds, glitch_params=None, iter=0, sim_
     valid_mask = (glitch_idx + total_samples) <= len(res)
     n_dropped = int(np.size(glitch_idx) - np.count_nonzero(valid_mask))
     if n_dropped:
-        print(f"Dropping {n_dropped} glitch(es) too close to the end of the TOD "
-              "to fit a full template window.")
+        message = (f"Dropping {n_dropped} glitch(es) too close to the end of the TOD to fit a full "
+                   "template window.")
+        utils.log_output(log_name, message)
     glitch_idx = np.asarray(glitch_idx)[valid_mask]
 
     if g.PLOTS:
@@ -80,7 +82,7 @@ def classify_glitches(glitch_idx, res, seconds, glitch_params=None, iter=0, sim_
             ax_sub.set_ylabel("Residual")
             ax_sub.set_xlabel("Time (s)")
             plt.xlim(seconds[0], seconds[1000])
-            fig_sub.savefig(f"{g.FIGURES_PATH}classification/residual_after_subtraction_{iter}.png")
+            fig_sub.savefig(f"{g.FIGURES_PATH}classification/{sim_name}/residual_after_subtraction_{iter}.png")
             plt.close(fig_sub)
 
     prev = {}
@@ -106,7 +108,7 @@ def classify_glitches(glitch_idx, res, seconds, glitch_params=None, iter=0, sim_
                 ax_addback.set_ylabel("Residual")
                 ax_addback.set_xlabel("Time (s)")
                 plt.xlim(seconds[0], seconds[1000])
-                fig_addback.savefig(f"{g.FIGURES_PATH}classification/residual_after_adding_back_glitch_{iter}.png")
+                fig_addback.savefig(f"{g.FIGURES_PATH}classification/{sim_name}/residual_after_adding_back_glitch_{iter}.png")
                 plt.close(fig_addback)
 
         data = res_copy[glitch_i + first_samples:glitch_i + total_samples]
@@ -123,20 +125,15 @@ def classify_glitches(glitch_idx, res, seconds, glitch_params=None, iter=0, sim_
         glitch_amps.append(popt[glitch_label][0])
 
         if g.PLOTS:
-            ax[0].plot(oneminute + seconds[glitch_i],
-                    models[glitch_label](oneminute, *popt[glitch_label]), color='green', alpha=0.5)
+            ax[0].plot(time_window + seconds[glitch_i],
+                    models[glitch_label](time_window, *popt[glitch_label]), color='green', alpha=0.5)
             ax[0].text(seconds[glitch_i], res_copy[glitch_i], glitch_label, fontsize=8, color='red',
                     rotation=45)
 
         if iter > 0 and prev_amps is not None and prev_labels is not None and old is not None:
-            res_copy[glitch_i:glitch_i + len(oneminute)] -= models[old[0]](oneminute, old[1])
+            res_copy[glitch_i:glitch_i + len(time_window)] -= models[old[0]](time_window, old[1])
 
-        if len(oneminute) > len(residual[glitch_i:glitch_i + len(oneminute)]):
-            time_window = oneminute[:len(residual[glitch_i:glitch_i + len(oneminute)])]
-        else:
-            time_window = oneminute
-
-        residual[glitch_i:glitch_i + len(oneminute)] -= models[glitch_label](time_window,
+        residual[glitch_i:glitch_i + len(time_window)] -= models[glitch_label](time_window,
                                                                              *popt[glitch_label])
 
     if g.PLOTS:

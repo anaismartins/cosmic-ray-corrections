@@ -22,7 +22,6 @@ glitch_time = np.linspace(0, g.NSECS, g.NSECS * 180, endpoint=False)  # glitch m
 glitch_indices = np.random.choice(len(seconds), nglitches, replace=False)
 glitch_amps = np.random.uniform(0.1, 1.0, nglitches)  # random amplitudes for the glitches
 glitch_types = np.random.choice(g.GLITCH_TYPES, nglitches, replace=True, p=[0.49, 0.49, 0.02])  # random glitch types
-# print(f"Glitch types: {glitch_types}")
 
 # plot each glitch type in the same figure
 if g.PLOTS:

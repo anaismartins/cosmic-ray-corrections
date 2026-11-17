@@ -47,21 +47,6 @@ def glitch_model_func(t, A=1, band="143-2a", glitch_type = "short", glitch_param
 
     return glitch_model * A
 
-def fit_glitch(res, glitch, secs):
-    adjusted_res = res - np.median(res)
-
-    popt, _, _, mesg, _ = curve_fit(glitch_model_func, secs[glitch: glitch + 2 * 180],
-                           adjusted_res[glitch: glitch + 2 * 180], p0=[1.0], bounds=(0, np.inf),
-                           full_output=True, nan_policy = "raise")
-
-    print(f"Fitted parameters: {popt}")
-    print(f"Message: {mesg}")
-
-    # subtract the glitch model from the data
-    nr_flag = 5
-    adjusted_res[glitch + nr_flag: glitch + 2 * 180] -= glitch_model_func(secs[glitch + nr_flag: glitch + 2 * 180] - secs[glitch], 1)
-    adjusted_res[glitch: glitch + nr_flag] = 0
-
 def stacking(result, glitch_idx, glitch_labels, glitch_amps, seconds, simname=""):
     window = int(g.NSECS * g.SAMPRATE)
     types = ('short', 'long', 'slow')
