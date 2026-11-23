@@ -11,7 +11,7 @@ import time
 from functools import partial
 from scipy.optimize import curve_fit
 
-def main(log_name=None):
+def main(log_name=None, glitch_params=None):
     if len(g.GLITCH_TYPES) > 1:
         simname = "143-2a_simulations_3600"
     else:
@@ -26,7 +26,7 @@ def main(log_name=None):
     sim_types = sim_types[sim_indices < len(res) - g.SAMPRATE * 60]
     sim_indices = sim_indices[sim_indices < len(res) - g.SAMPRATE * 60]
 
-    glitch_idx, score = detection.matched_filter(res)
+    glitch_idx, score = detection.matched_filter(res, glitch_params['short'])
     # match the detected glitches with the simulated ones
     matched_indices = np.intersect1d(glitch_idx, sim_indices)
     message = ("[Iteration 0] Detection accuracy: "
@@ -54,6 +54,8 @@ def main(log_name=None):
     if len(g.GLITCH_TYPES) > 1:
         glitch_idx, glitch_labels, glitch_amps = classification.classify_glitches(glitch_idx, res,
                                                                                 seconds,
+                                                                                glitch_params,
+                                                                                iter=0,
                                                                                 sim_name=simname,
                                                                                 log_name=log_name)
 
@@ -81,7 +83,8 @@ def main(log_name=None):
             glitch_amps[glitch_n] = popt[0]
 
     result, fit_amps = subtraction.subtract_glitches_from_data(glitch_idx, seconds,
-                                                                  glitch_labels, glitch_amps, res)
+                                                                  glitch_labels, glitch_amps, res,
+                                                                  glitch_params=glitch_params)
 
     # calculate normalized chi2
     chi2_value = utils.chi2(result)
@@ -103,14 +106,15 @@ def main(log_name=None):
         plt.title('Glitch Subtraction Result - Iteration 0')
         plt.legend()
         plt.xlim(0, seconds[1000])
-        plt.savefig(f"{g.FIGURES_PATH}subtraction/{simname}/glitch_subtraction_result_0.png")
+        plt.savefig(f"{g.FIGURES_PATH}subtraction/{simname}/glitch_subtraction_result_00.png")
         plt.close()
 
     final_stack = templates.stacking(result, glitch_idx, glitch_labels, fit_amps, seconds,
-                                     simname=simname)
+                                     glitch_params=glitch_params, simname=simname)
 
     temp = templates._load_glitch_params()
     glitch_params = {}
+    glitch_temp_orig = {}
     for glitch_type in g.GLITCH_TYPES:
         if final_stack[glitch_type] is None:
             message = f"No {glitch_type} glitches found, keeping previous template"
@@ -139,6 +143,22 @@ def main(log_name=None):
             plt.ylabel("Amplitude")
             plt.legend()
             plt.savefig(f"{g.FIGURES_PATH}templates/{simname}/glitch_fitting_{glitch_type}_0.png")
+            plt.close()
+
+            # plot comparison with the original template
+            seconds_for_plot = seconds[:int(g.NSECS * g.SAMPRATE)]
+            glitch_temp_new = templates.glitch_model_func(seconds_for_plot, 1,
+                                                          glitch_type=glitch_type,
+                                                          glitch_params=glitch_params[glitch_type])
+            glitch_temp_orig[glitch_type] = templates.glitch_model_func(seconds_for_plot, 1,
+                                                           glitch_type=glitch_type)
+            plt.plot(seconds_for_plot, glitch_temp_new, label="New Template")
+            plt.plot(seconds_for_plot, glitch_temp_orig[glitch_type], label="Original Template")
+            plt.title(f"Comparison of Original and New Template for {glitch_type} Glitches - Iteration 0")
+            plt.xlabel("Time (s)")
+            plt.ylabel("Amplitude")
+            plt.legend()
+            plt.savefig(f"{g.FIGURES_PATH}templates/{simname}/template_comparison_{glitch_type}_00.png")
             plt.close()
 
     for i in range(g.MAXITER):
@@ -221,7 +241,7 @@ def main(log_name=None):
             plt.title(f'Glitch Subtraction Result - Iteration {i+1}')
             plt.legend()
             plt.xlim(0, seconds[1000])
-            plt.savefig(f"{g.FIGURES_PATH}subtraction/{simname}/glitch_subtraction_result_{(i+1)}.png")
+            plt.savefig(f"{g.FIGURES_PATH}subtraction/{simname}/glitch_subtraction_result_{(i+1):02d}.png")
             plt.close()
 
         final_stack = templates.stacking(result, glitch_idx, glitch_labels, fit_amps, seconds,
@@ -256,10 +276,43 @@ def main(log_name=None):
                 plt.savefig(f"{g.FIGURES_PATH}templates/{simname}/glitch_fitting_{glitch_type}_{i+1}.png")
                 plt.close()
 
+                # plot comparison with the original template
+                glitch_temp_new = templates.glitch_model_func(seconds_for_plot, 1, glitch_type=glitch_type,
+                                                              glitch_params=glitch_params[glitch_type])
+                plt.plot(seconds_for_plot, glitch_temp_new, label="New Template")
+                plt.plot(seconds_for_plot, glitch_temp_orig[glitch_type], label="Original Template")
+                plt.title(f"Comparison of Original and New Template for {glitch_type} Glitches - Iteration {i+1}")
+                plt.xlabel("Time (s)")
+                plt.ylabel("Amplitude")
+                plt.legend()
+                plt.savefig(f"{g.FIGURES_PATH}templates/{simname}/template_comparison_{glitch_type}_{(i+1):02d}.png")
+                plt.close()
+
 if __name__ == "__main__":
     t = time.time()
     utils.log_params(f"{g.LOG_PATH}{t}.log")
 
     # start with a different template
+    orig_glitch = templates.glitch_model_func(np.arange(0, g.NSECS, 1 / g.SAMPRATE), 1,
+                                              glitch_type="short")
 
-    main(log_name=f"{g.LOG_PATH}{t}.log")
+    glitch_params_original = templates._load_glitch_params()
+    glitch_params_new = glitch_params_original["143-2a"].copy()
+    print("Original glitch parameters:", glitch_params_new["short"])
+    glitch_params_new["short"]["Amplitude1"] = 0.5
+    glitch_params_new["short"]["Amplitude2"] = 0.3
+    glitch_params_new["short"]["Amplitude3"] = 0.1
+    new_glitch = templates.glitch_model_func(np.arange(0, g.NSECS, 1 / g.SAMPRATE), 1,
+                                            glitch_type="short",
+                                            glitch_params=glitch_params_new["short"])
+    
+    plt.plot(np.arange(0, g.NSECS, 1 / g.SAMPRATE), orig_glitch, label="Original Template")
+    plt.plot(np.arange(0, g.NSECS, 1 / g.SAMPRATE), new_glitch, label="New Template")
+    plt.title("Comparison of Original and New Template for Short Glitches")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Amplitude")
+    plt.legend()
+    plt.savefig(f"{g.FIGURES_PATH}templates/new_template.png")
+    plt.close()
+
+    main(log_name=f"{g.LOG_PATH}{t}.log", glitch_params=glitch_params_new)

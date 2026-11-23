@@ -124,7 +124,7 @@ def glitch_estimation(seconds, stack, glitch_type, glitch_params=None):
         tau_guess.append(glitch_params[f"Tau{amp_i}"])
 
     p0 = np.concatenate([amp_guess, tau_guess])
-    popt, _ = curve_fit(glitch_model, seconds, stack, p0=p0, bounds=(0, np.inf))
+    popt, _ = curve_fit(glitch_model, seconds, stack, p0=p0, bounds=(0, np.inf), maxfev=5000)
     
     glitch_params = {'Amplitude' + str(i + 1): popt[i] for i in range(8)}
     glitch_params.update({'Tau' + str(i + 1): popt[i +8] for i in range(8)})

@@ -29,12 +29,10 @@ def classify_glitches(glitch_idx, res, seconds, glitch_params=None, iter=0, sim_
     first_samples = int(g.FAST_PART * g.SAMPRATE)
 
     # if iter == 0 , we use only 1 second after the glitch is detected to fit
-    if glitch_params is None and iter == 0:
+    if iter == 0:
         total_samples = int(g.CLASSIFY_SECS_FIRST * g.SAMPRATE)
-    elif glitch_params is not None and iter > 0:
-        total_samples = int(g.CLASSIFY_SECS * g.SAMPRATE)
     else:
-        raise ValueError("Invalid combination of glitch_params and iter")
+        total_samples = int(g.CLASSIFY_SECS * g.SAMPRATE)
     slowpart = np.arange(first_samples, total_samples) / g.SAMPRATE
     oneminute = np.arange(0, int(60 * g.SAMPRATE)) / g.SAMPRATE
 
