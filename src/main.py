@@ -12,7 +12,10 @@ from functools import partial
 from scipy.optimize import curve_fit
 
 def main(log_name=None):
-    simname = "143-2a_simulations_3600_only_short"
+    if len(g.GLITCH_TYPES) > 1:
+        simname = "143-2a_simulations_3600"
+    else:
+        simname = "143-2a_simulations_3600_only_short"
 
     res = np.load(f"{g.DATA_PATH}{simname}.npy")
     sim_types = np.load(f"{g.DATA_PATH}{simname}_types.npy")
@@ -57,7 +60,7 @@ def main(log_name=None):
         # count how many wrong classifications
         wrong_classifications = np.sum(glitch_labels[np.isin(glitch_idx, matched_indices)] != sim_types[np.isin(sim_indices, matched_indices)])
         message = ("[Iteration 0] Classification accuracy: "
-                f"{100 * (1 - wrong_classifications / len(glitch_idx)):.2f}% Percentage of "
+                f"{100 * (1 - wrong_classifications / len(glitch_idx)):.2f}%\nPercentage of "
                 "glitches classified as 'short': "
                 f"{100 * np.sum(glitch_labels == 'short') / len(glitch_labels):.2f}%\nPercentage of "
                 "glitches classified as 'long': "
@@ -82,7 +85,7 @@ def main(log_name=None):
 
     # calculate normalized chi2
     chi2_value = utils.chi2(result)
-    message = f"[Iteration 0] Chi2: {int(chi2_value)}"
+    message = f"[Iteration 0] Chi2: {chi2_value}"
     utils.log_output(log_name, message)
 
     if g.PLOTS:
@@ -142,6 +145,7 @@ def main(log_name=None):
         message = f"Iteration {i+1}/{g.MAXITER}"
         utils.log_output(log_name, message)
         prev_idx = glitch_idx.copy()
+        prev_labels = glitch_labels.copy()
         glitch_idx, score = detection.matched_filter(res, glitch_params['short'])
 
         matched_indices = np.intersect1d(glitch_idx, sim_indices)
@@ -171,7 +175,7 @@ def main(log_name=None):
 
             wrong_classifications = np.sum(glitch_labels[np.isin(glitch_idx, matched_indices)] != sim_types[np.isin(sim_indices, matched_indices)])
             message = (f"[Iteration {i+1}] Classification accuracy: "
-                    f"{100 * (1 - wrong_classifications / len(glitch_idx)):.2f}% Percentage of "
+                    f"{100 * (1 - wrong_classifications / len(glitch_idx)):.2f}%\nPercentage of "
                 "glitches classified as 'short': "
                 f"{100 * np.sum(glitch_labels == 'short') / len(glitch_labels):.2f}%\nPercentage of "
                 "glitches classified as 'long': "
@@ -193,7 +197,10 @@ def main(log_name=None):
 
         # if the new glitch idx match the previous one, as well as the label, use the pewviously 
         # estimated amplitues. otherwise take from the newly estimated ones
-        prev_amps = np.array([fit_amps[prev_idx == idx][0] if (idx in prev_idx and glitch_labels[prev_idx == idx][0] == label) else amp
+        prev_lookup = {}
+        if len(fit_amps) == len(prev_idx):  # guard against the extra amplitude
+            prev_lookup = {(int(pi), pl): pa for pi, pl, pa in zip(prev_idx, prev_labels, fit_amps)}
+        prev_amps = np.array([prev_lookup.get((int(idx), label), amp)
                             for idx, label, amp in zip(glitch_idx, glitch_labels, glitch_amps)])
 
         result, fit_amps = subtraction.subtract_glitches_from_data(glitch_idx, seconds,
@@ -202,7 +209,7 @@ def main(log_name=None):
 
         # calculate chi2
         chi2_value = utils.chi2(result)
-        message = (f"[Iteration {i+1}] Chi2: {int(chi2_value)}")
+        message = (f"[Iteration {i+1}] Chi2: {chi2_value}")
         utils.log_output(log_name, message)
 
         if g.PLOTS:
@@ -252,4 +259,7 @@ def main(log_name=None):
 if __name__ == "__main__":
     t = time.time()
     utils.log_params(f"{g.LOG_PATH}{t}.log")
+
+    # start with a different template
+
     main(log_name=f"{g.LOG_PATH}{t}.log")
